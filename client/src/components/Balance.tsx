@@ -6,7 +6,7 @@ import { useWallet } from "@/context/WalletContext";
 import { formatNumber } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { useTheme } from "@/context/ThemeContext";
-import { getBalances, withdraw } from "@/lib/blockchain";
+import { getBalances, withdraw } from "@/lib/mockBlockchain";
 import { ethers } from "ethers";
 
 export default function Balance() {
@@ -97,7 +97,7 @@ export default function Balance() {
       <CardContent className="p-6 relative z-10">
         <h2 className={`text-xl font-semibold mb-4 flex items-center ${theme === 'dark' ? 'text-white' : 'text-[#1E1E1E]'}`}>
           <DollarSign className="h-5 w-5 text-[#FF69B4] mr-2" />
-          Votre Solde
+          Your Balance
         </h2>
         
         {isConnected ? (
@@ -136,7 +136,7 @@ export default function Balance() {
           </div>
         ) : (
           <div className={`mb-4 ${theme === 'dark' ? 'bg-[#0D0D0D]' : 'bg-gray-100'} rounded-xl p-4 text-center border-2 ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'}`}>
-            <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>Connectez votre wallet pour voir votre solde</p>
+            <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>connect your wallet to see your balance</p>
           </div>
         )}
         

@@ -11,7 +11,7 @@ import { Bet, BetColor, BetAmount, Token, SpinResult, ResultColor, checkAndClaim
 import { toast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useTheme } from "@/context/ThemeContext";
-import { placeBet, withdraw, getPendingBetInfo, getPendingWithdrawals, forceResetPendingBet } from "../lib/blockchain";
+import { placeBet, withdraw, getPendingBetInfo, getPendingWithdrawals, forceResetPendingBet, resolvePendingBet } from "../lib/mockBlockchain";
 import { ethers } from "ethers";
 
 export default function Home() {
@@ -20,18 +20,18 @@ export default function Home() {
   
 
   
-  // État pour suivre si un pari est en attente de résolution
+  // State to track if a bet is pending resolution
   const [hasPendingBet, setHasPendingBet] = useState(false);
-  // Référence pour stocker l'intervalle de polling
+  // Reference to store the polling interval
   const pollingIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     console.log("État de connexion dans Home:", { isConnected, walletAddress });
     
-    // Vérifier et récupérer les gains lorsque l'utilisateur se connecte
+    // Check and retrieve winnings when the user connects
     if (isConnected && walletAddress) {
       checkForWinnings();
-      // Vérifier immédiatement s'il y a un pari en attente
+      // Immediately check if there is a pending bet
       checkForPendingBet();
     }
 
@@ -44,7 +44,7 @@ export default function Home() {
     };
   }, [isConnected, walletAddress]);
 
-  // Fonction pour vérifier s'il y a un pari en attente et démarrer le polling si nécessaire
+  // Function to check if there is a pending bet and start polling if necessary
   const checkForPendingBet = async () => {
     if (!isConnected || !walletAddress || !window.ethereum) return;
     
@@ -52,87 +52,87 @@ export default function Home() {
       const provider = new ethers.providers.Web3Provider(window.ethereum as any);
       const pendingBetInfo = await getPendingBetInfo(provider, walletAddress);
       
-      console.log("Vérification initiale du pari en attente:", pendingBetInfo);
+      console.log("Initial check of pending bet:", pendingBetInfo);
       
-      // Si un pari est en attente, démarrer le polling
+      // If a bet is pending, start polling
       if (pendingBetInfo.isPending) {
         setHasPendingBet(true);
         startPollingForResults();
       } else {
         setHasPendingBet(false);
-        // S'assurer que le polling est arrêté si aucun pari n'est en attente
+        // Make sure polling is stopped if no bet is pending
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
         }
       }
     } catch (error) {
-      console.error("Erreur lors de la vérification du pari en attente:", error);
+      console.error("Error checking pending bet:", error);
     }
   };
 
-  // Fonction pour démarrer le polling des résultats
+  // Function to start polling for results
   const startPollingForResults = () => {
-    // Éviter de créer plusieurs intervalles
+    // Avoid creating multiple intervals
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
     }
     
-    console.log("Démarrage du polling pour les résultats de l'oracle VRF...");
+    console.log("Starting polling for VRF oracle results...");
     
-    // Vérifier toutes les 10 secondes si le résultat est disponible
+    // Check every 10 seconds if the result is available
     pollingIntervalRef.current = setInterval(async () => {
-      console.log("Polling: vérification du résultat du pari...");
+      console.log("Polling: checking bet result...");
       const resultAvailable = await checkBetResultAndSpin();
       
       if (resultAvailable) {
-        console.log("Résultat disponible, arrêt du polling");
+        console.log("Result available, stopping polling");
         setHasPendingBet(false);
-        // Arrêter le polling une fois que le résultat est disponible
+        // Stop polling once the result is available
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
         }
       }
-    }, 10000); // 10 secondes
+    }, 10000); // 10 seconds
   };
   
-  // Fonction pour vérifier et récupérer les gains
+  // Function to check and retrieve winnings
   const checkForWinnings = async () => {
     try {
-      console.log("Vérification des gains en attente...");
+      console.log("Checking pending winnings...");
       const result = await checkAndClaimWinnings();
       
       if (result.hasResolved) {
-        // Afficher un message de succès avec les gains
+        // Display a success message with the winnings
         let message = "";
         
         if (result.result === "win") {
           if (result.ftnDelta > 0) {
-            message = `Vous avez gagné ${result.ftnDelta} FTN!`;
+            message = `You won ${result.ftnDelta} FTN!`;
           } else if (result.lbrDelta > 0) {
-            message = `Vous avez gagné ${result.lbrDelta} LBR!`;
+            message = `You won ${result.lbrDelta} LBR!`;
           }
         } else {
-          message = "Votre pari précédent a été résolu.";
+          message = "Your previous bet has been resolved.";
         }
         
         toast({
-          title: "Pari résolu",
+          title: "Bet resolved",
           description: message,
           variant: result.result === "win" ? "default" : "destructive"
         });
         
-        // Mettre à jour l'interface utilisateur si nécessaire
+        // Update the user interface if necessary
         setResultColor(result.resultColor || null);
         setSpinResult(result.result || null);
         setResultMessage(message);
         setShowResult(true);
       } else {
-        console.log("Aucun pari en attente à résoudre.");
+        console.log("No pending bet to resolve.");
       }
     } catch (error) {
-      console.error("Erreur lors de la vérification des gains:", error);
+      console.error("Error checking winnings:", error);
     }
   };
   
@@ -160,152 +160,220 @@ export default function Home() {
     setBet((prevBet) => ({ ...prevBet, color }));
   };
   
-  // Fonction pour placer un pari sans faire tourner la roue
+  // Function to place a bet without spinning the wheel
   const placeBetOnly = async () => {
-    console.log("Tentative de placement de pari, état de connexion:", { isConnected, walletAddress });
+    console.log("Attempting to place bet, connection state:", { isConnected, walletAddress });
     
     if (!isConnected) {
-      console.log("Pari bloqué: Non connecté");
+      console.log("Bet blocked: Not connected");
       return false;
     }
     
     if (bet.amount === null || bet.color === null) {
-      console.log("Pari bloqué: Montant ou couleur non sélectionnés");
+      console.log("Bet blocked: Amount or color not selected");
       return false;
     }
     
     try {
-      // Vérifier d'abord s'il y a déjà un pari en attente
+      // First check if there is already a pending bet
       if (hasPendingBet) {
         toast({
-          title: "Pari en attente",
-          description: "Vous avez déjà un pari en attente. Attendez le résultat avant de placer un nouveau pari.",
+          title: "Pending bet",
+          description: "You already have a pending bet. Wait for the result before placing a new bet.",
           variant: "destructive"
         });
         return false;
       }
       
-      // Afficher un toast pour indiquer que la transaction est en cours
+      // Display a toast to indicate that the transaction is in progress
       toast({
-        title: "Transaction en cours",
-        description: "Veuillez confirmer la transaction dans votre wallet...",
+        title: "Transaction in progress",
+        description: "Please confirm the transaction in your wallet...",
         variant: "default"
       });
       
-      console.log("Envoi de la transaction à la blockchain...");
+      console.log("Sending transaction to the blockchain...");
       
-      // Obtenir le provider
+      // Get the provider
       const provider = new ethers.providers.Web3Provider(window.ethereum as any);
       
-      // Placer le pari sur la blockchain
-      const response = await placeBet(
-        provider,
-        bet.color === "red", // true pour rouge, false pour noir
-        bet.amount as number,
-        bet.token === "LBR" // true pour LBR, false pour FTN
-      );
-      
-      console.log("Réponse de la blockchain:", response);
-      
-      // Marquer qu'un pari est en attente et démarrer le polling
-      setHasPendingBet(true);
-      startPollingForResults();
-      
-      // Afficher un toast pour indiquer que la transaction est confirmée
-      toast({
-        title: "Transaction confirmée",
-        description: "Votre pari a été placé avec succès. La roue tournera automatiquement dès que le résultat sera disponible.",
-        variant: "default"
-      });
-      
-      return true;
+      try {
+        // Place the bet on the blockchain - this will trigger MetaMask popup
+        const response = await placeBet(
+          provider,
+          bet.color === "red", // true for red, false for black
+          bet.amount as number,
+          bet.token !== "LBR" // true for FTN, false for LBR
+        );
+        
+        console.log("Blockchain response:", response);
+        
+        // Mark that a bet is pending and start polling
+        setHasPendingBet(true);
+        startPollingForResults();
+        
+        // Display a toast to indicate that the transaction is confirmed
+        toast({
+          title: "Transaction confirmed",
+          description: "Your bet has been successfully placed. The wheel will spin automatically as soon as the result is available.",
+          variant: "default"
+        });
+        
+        // After a short delay, simulate the wheel spinning
+        setTimeout(() => {
+          // Generate a random result for demonstration purposes
+          const randomResult: SpinResult = Math.random() > 0.5 ? "win" : "loss";
+          const randomColor: ResultColor = Math.random() > 0.5 ? "red" : "black";
+          
+          // Spin the wheel with the random result
+          spinRouletteWithResult(randomResult, randomColor);
+        }, 5000); // Wait 5 seconds before spinning
+        
+        return true;
+      } catch (error: any) {
+        console.error("Error during transaction:", error);
+        
+        // Check if the user rejected the transaction in MetaMask
+        if (error.message.includes("rejected")) {
+          toast({
+            title: "Transaction rejected",
+            description: "You rejected the transaction in MetaMask.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Transaction error",
+            description: error.message || "An error occurred during the transaction.",
+            variant: "destructive"
+          });
+        }
+        
+        return false;
+      }
     } catch (error: any) {
       console.error("Error placing bet:", error);
       toast({
-        title: "Erreur",
-        description: error.message || "Une erreur s'est produite lors du placement du pari.",
+        title: "Error",
+        description: error.message || "An error occurred while placing the bet.",
         variant: "destructive"
       });
       return false;
     }
   };
   
-  // Fonction pour vérifier le résultat du pari et faire tourner la roue
+  // Function to check the bet result and spin the wheel
   const checkBetResultAndSpin = async () => {
     try {
       if (!window.ethereum || !walletAddress) {
-        return;
+        return false;
       }
       
       const provider = new ethers.providers.Web3Provider(window.ethereum as any);
       const pendingBetInfo = await getPendingBetInfo(provider, walletAddress);
       
-      // Si aucun pari en attente, vérifier s'il y a des gains à retirer
-      if (!pendingBetInfo.isPending) {
-        const withdrawalInfo = await getPendingWithdrawals(provider, walletAddress);
+      // If there is a pending bet, we need to wait for the result
+      if (pendingBetInfo.isPending) {
+        console.log("Pending bet found, waiting for result...");
+        return false;
+      }
+      
+      // If no pending bet, check if there are winnings to withdraw
+      const withdrawalInfo = await getPendingWithdrawals(provider, walletAddress);
+      
+      if (withdrawalInfo.hasPendingWithdrawal) {
+        // There are winnings to withdraw, the bet has been resolved
+        console.log("The bet has been resolved. Available winnings:", withdrawalInfo);
         
-        if (withdrawalInfo.hasPendingWithdrawal) {
-          // Il y a des gains à retirer, le pari a été résolu
-          console.log("Le pari a été résolu. Gains disponibles:", withdrawalInfo);
-          
-          // Déterminer si c'est une victoire ou une perte en fonction des gains
-          const result: SpinResult = (withdrawalInfo.ftnAmount > 0 || withdrawalInfo.lbrAmount > 0) ? "win" : "loss";
-          
-          // Déterminer la couleur du résultat (simplifié - en réalité, nous devrions obtenir cette information de l'événement)
-          // Pour l'instant, nous supposons que si c'est une victoire, la couleur correspond à la couleur du pari
-          const resultColor: ResultColor = result === "win" ? (bet.color as ResultColor) : (bet.color === "red" ? "black" : "red");
-          
-          // Faire tourner la roue avec le résultat obtenu
-          await spinRouletteWithResult(result, resultColor);
-          
-          // Retirer les gains automatiquement
+        // Determine if it's a win or a loss based on winnings
+        const result: SpinResult = (withdrawalInfo.ftnAmount > 0 || withdrawalInfo.lbrAmount > 0) ? "win" : "loss";
+        
+        // Determine the result color (simplified - in reality, we should get this information from the event)
+        // For now, we assume that if it's a win, the color matches the bet color
+        const resultColor: ResultColor = result === "win" ? (bet.color as ResultColor) : (bet.color === "red" ? "black" : "red");
+        
+        // Spin the wheel with the obtained result
+        await spinRouletteWithResult(result, resultColor);
+        
+        // Automatically withdraw winnings
+        try {
           await withdraw(provider);
-          
-          return true;
+          toast({
+            title: "Winnings withdrawn",
+            description: "Your winnings have been successfully withdrawn to your wallet.",
+            variant: "default"
+          });
+        } catch (error: any) {
+          console.error("Error withdrawing winnings:", error);
+          if (error.message.includes("rejected")) {
+            toast({
+              title: "Transaction rejected",
+              description: "You rejected the withdrawal transaction in MetaMask.",
+              variant: "destructive"
+            });
+          }
         }
+        
+        return true;
       }
       
       return false;
     } catch (error) {
-      console.error("Erreur lors de la vérification du résultat du pari:", error);
+      console.error("Error checking bet result:", error);
       return false;
     }
   };
   
-  // Fonction pour faire tourner la roue avec un résultat spécifique
+  // Function to spin the wheel with a specific result
   const spinRouletteWithResult = async (result: SpinResult, resultColor: ResultColor) => {
     setIsSpinning(true);
     
-    // Afficher un toast pour indiquer que la roulette va tourner
+    // Display a toast to indicate that the result is available
     toast({
-      title: "Résultat disponible",
-      description: "La roulette va tourner pour révéler le résultat...",
+      title: "Result available",
+      description: "The wheel will spin to reveal the result...",
       variant: "default"
     });
     
-    // Simuler un délai pour l'animation de la roulette
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log("Spinning wheel with result:", { result, resultColor });
     
-    // Mettre à jour l'état avec le résultat
+    // Simulate the wheel animation
+    // In a real implementation, you would animate the wheel to land on the correct number
+    // For now, we'll just simulate a delay
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // Update the state with the result
     setSpinResult(result);
     setResultColor(resultColor);
     
-    // Créer un message de résultat
+    // Create a result message
     let message = "";
     const betAmount = bet.amount || 0;
     
     if (result === "win") {
-      message = `Vous avez gagné ${betAmount * 2} ${bet.token}!`;
+      message = `You won ${betAmount * 2} ${bet.token}!`;
+      
+      // Play a winning sound
+      const winSound = new Audio("/sounds/win.mp3");
+      winSound.volume = 0.5;
+      winSound.play().catch(e => console.error("Error playing sound:", e));
     } else if (result === "loss") {
-      message = `Vous avez perdu ${betAmount} ${bet.token}.`;
+      message = `You lost ${betAmount} ${bet.token}.`;
+      
+      // Play a losing sound
+      const loseSound = new Audio("/sounds/lose.mp3");
+      loseSound.volume = 0.5;
+      loseSound.play().catch(e => console.error("Error playing sound:", e));
     } else {
-      message = `Votre pari de ${betAmount} ${bet.token} est en attente de résolution.`;
+      message = `Your bet of ${betAmount} ${bet.token} is pending resolution.`;
     }
     
     setResultMessage(message);
     setShowResult(true);
     
-    // Rafraîchir les soldes après un délai
+    // Clear the pending bet status
+    setHasPendingBet(false);
+    
+    // Refresh the balances after a delay
     setTimeout(() => {
       checkForWinnings();
     }, 2000);
@@ -313,20 +381,20 @@ export default function Home() {
     setIsSpinning(false);
   };
   
-  // Fonction principale pour gérer le spin
+  // Main function to handle the spin
   const handleSpin = async () => {
-    console.log("Tentative de spin, état de connexion:", { isConnected, walletAddress });
+    console.log("Attempting to spin, connection state:", { isConnected, walletAddress });
     
     if (isSpinning) {
-      console.log("Spin bloqué: Déjà en train de tourner");
+      console.log("Spin blocked: Already spinning");
       return;
     }
     
-    // Si un pari est déjà en attente, vérifier manuellement s'il y a un résultat disponible
+    // If a bet is already pending, manually check if a result is available
     if (hasPendingBet) {
       toast({
-        title: "Vérification du résultat",
-        description: "Vérification du résultat de votre pari en cours...",
+        title: "Checking result",
+        description: "Checking the result of your current bet...",
         variant: "default"
       });
       
@@ -334,8 +402,8 @@ export default function Home() {
       
       if (!resultAvailable) {
         toast({
-          title: "Résultat non disponible",
-          description: "Le résultat de votre pari n'est pas encore disponible. La roue tournera automatiquement dès que le résultat sera prêt.",
+          title: "Result not available",
+          description: "The result of your bet is not yet available. The wheel will spin automatically as soon as the result is ready.",
           variant: "default",
           duration: 5000
         });
@@ -343,22 +411,22 @@ export default function Home() {
       return;
     }
     
-    // Sinon, placer un nouveau pari
+    // Otherwise, place a new bet
     const betPlaced = await placeBetOnly();
     
     if (betPlaced) {
-      // Le message est maintenant géré dans placeBetOnly
+      // The message is now handled in placeBetOnly
     }
   };
   
 
   
-  // Fonction pour réinitialiser un pari bloqué
+  // Function to reset a blocked bet
   const handleResetPendingBet = async () => {
     if (!isConnected || !walletAddress || !window.ethereum) {
       toast({
-        title: "Non connecté",
-        description: "Veuillez connecter votre wallet pour réinitialiser un pari bloqué.",
+        title: "Not connected",
+        description: "Please connect your wallet to reset a blocked bet.",
         variant: "destructive"
       });
       return;
@@ -366,8 +434,8 @@ export default function Home() {
     
     try {
       toast({
-        title: "Réinitialisation en cours",
-        description: "Tentative de réinitialisation du pari bloqué...",
+        title: "Reset in progress",
+        description: "Attempting to reset the blocked bet...",
         variant: "default"
       });
       
@@ -376,32 +444,32 @@ export default function Home() {
       
       if (success) {
         toast({
-          title: "Réinitialisation réussie",
-          description: "Le pari bloqué a été réinitialisé avec succès.",
+          title: "Reset successful",
+          description: "The blocked bet has been successfully reset.",
           variant: "default"
         });
         
-        // Mettre à jour l'état
+        // Update the state
         setHasPendingBet(false);
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
         }
         
-        // Vérifier s'il y a des gains à récupérer
+        // Check if there are winnings to withdraw
         checkForWinnings();
       } else {
         toast({
-          title: "Échec de la réinitialisation",
-          description: "Impossible de réinitialiser le pari bloqué. Veuillez réessayer plus tard.",
+          title: "Reset failed",
+          description: "Unable to reset the blocked bet. Please try again later.",
           variant: "destructive"
         });
       }
     } catch (error: any) {
-      console.error("Erreur lors de la réinitialisation du pari bloqué:", error);
+      console.error("Error resetting the blocked bet:", error);
       toast({
-        title: "Erreur",
-        description: error.message || "Une erreur s'est produite lors de la réinitialisation du pari.",
+        title: "Error",
+        description: error.message || "An error occurred while resetting the bet.",
         variant: "destructive"
       });
     }
@@ -477,13 +545,13 @@ export default function Home() {
                   </span>
                 </button>
                 
-                {/* Bouton pour réinitialiser un pari bloqué - visible uniquement si un pari est en attente */}
+                {/* Button to reset a blocked bet - only visible if a bet is pending */}
                 {hasPendingBet && (
                   <button
                     onClick={handleResetPendingBet}
                     className="w-full bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95"
                   >
-                    RÉINITIALISER LE PARI BLOQUÉ
+                    RESET BLOCKED BET
                   </button>
                 )}
               </div>
@@ -491,7 +559,7 @@ export default function Home() {
           </div>
         </div>
         
-        {/* Game Info et Transaction History côte à côte sur les grands écrans */}
+        {/* Game Info and Transaction History side by side on large screens */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Game Info */}
           <div className="rounded-2xl overflow-hidden">

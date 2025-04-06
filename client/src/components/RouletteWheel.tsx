@@ -78,7 +78,7 @@ const RouletteWheel: React.FC<RouletteWheelProps> = ({
     
     // Sélectionner un résultat aléatoire
     const randomNumber = Math.floor(Math.random() * numbers.length);
-    const extraSpins = 5;
+    const extraSpins = 3; // 3 tours complets
     const targetRotation = rotation + (360 * extraSpins) + (randomNumber * (360 / numbers.length));
     
     // Set rotation only once when spinning changes to true
@@ -86,7 +86,7 @@ const RouletteWheel: React.FC<RouletteWheelProps> = ({
 
     // Animer l'indicateur de sélection
     let currentIndex = 0;
-    const intervalTime = 100; // Démarre rapidement
+    const intervalTime = 50; // Démarre plus rapidement
     let currentInterval = intervalTime;
     
     const animateSelection = () => {
@@ -94,9 +94,9 @@ const RouletteWheel: React.FC<RouletteWheelProps> = ({
       currentIndex = (currentIndex + 1) % numbers.length;
       
       // Ralentir progressivement l'animation de sélection
-      currentInterval *= 1.05;
+      currentInterval *= 1.03; // Ralentissement plus linéaire
       
-      if (currentInterval < 500) { // Continuer l'animation jusqu'à ce qu'on atteigne une vitesse plus lente
+      if (currentInterval < 700) { // Continuer l'animation jusqu'à ce qu'on atteigne une vitesse plus lente
         setTimeout(animateSelection, currentInterval);
       } else {
         // Sélection finale
@@ -109,10 +109,12 @@ const RouletteWheel: React.FC<RouletteWheelProps> = ({
     };
 
     animateSelection();
-    
-    // Only include spinning in the dependency array, not rotation
-    // This prevents the infinite loop when rotation changes
   }, [spinning]);
+
+  const calculateDynamicAmount = (baseAmount: number, isWin: boolean): number => {
+    const multiplier = isWin ? 2 : 1; // Double en cas de gain, sinon même montant
+    return baseAmount * multiplier;
+  };
 
   return (
     <div className="relative w-full h-full">

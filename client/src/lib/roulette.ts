@@ -2,9 +2,9 @@
 export type Token = "FTN" | "LBR";
 export type BetColor = "red" | "black";
 export type BetAmount = 0.1 | 0.5 | 1 | 5 | 10 | 25;
-// Résultat du pari : gagné, perdu ou en attente de résolution
+// Bet result: win, loss or pending resolution
 export type SpinResult = "win" | "loss" | "pending";
-// Couleur sur laquelle la bille s'est arrêtée : rouge, noir ou vert (0)
+// Color where the ball stopped: red, black or green (0)
 export type ResultColor = "red" | "black" | "green";
 
 export interface Bet {
@@ -38,7 +38,7 @@ export interface SpinResponse {
   transaction: Transaction;
 }
 
-import { placeBet as blockchainPlaceBet, getBalances, getPendingBetInfo, resolvePendingBet, PendingBetInfo, getPendingWithdrawals, PendingWithdrawalInfo } from './blockchain';
+import { placeBet as blockchainPlaceBet, getBalances, getPendingBetInfo, resolvePendingBet, PendingBetInfo, getPendingWithdrawals, PendingWithdrawalInfo, getTransactionHistory as getMockTransactionHistory } from './mockBlockchain';
 import { ethers } from 'ethers';
 
 export async function placeBet(
@@ -48,7 +48,7 @@ export async function placeBet(
   betColor: BetColor
 ): Promise<SpinResponse> {
   try {
-    // Obtenir le provider depuis window.ethereum
+    // Get provider from window.ethereum
     if (!window.ethereum) {
       throw new Error("MetaMask is not installed");
     }
@@ -56,23 +56,23 @@ export async function placeBet(
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     const address = await provider.getSigner().getAddress();
     
-    // Vérifier s'il y a des gains en attente à récupérer
+    // Check if there are pending withdrawals to claim
     const withdrawalInfo = await getPendingWithdrawals(provider, address);
     
     if (withdrawalInfo.hasPendingWithdrawal) {
       try {
-        // Récupérer les gains automatiquement
+        // Automatically retrieve winnings
         await resolvePendingBet(provider, address);
-        console.log("Gains récupérés automatiquement.");
+        console.log("Winnings automatically claimed.");
       } catch (error) {
-        console.warn("Erreur lors de la récupération des gains, mais nous continuons", error);
+        console.warn("Error claiming winnings, but we continue", error);
       }
     }
     
-    // Convertir la couleur du pari en booléen (true pour rouge, false pour noir)
+    // Convert bet color to boolean (true for red, false for black)
     const betOnRed = betColor === "red";
     
-    // Placer le pari sur la blockchain
+    // Place the bet on the blockchain
     const receipt = await blockchainPlaceBet(
       provider,
       betOnRed,
@@ -80,27 +80,27 @@ export async function placeBet(
       betToken === "FTN"
     );
     
-    // Obtenir les soldes mis à jour
+    // Get updated balances
     const { ftnBalance, lbrBalance } = await getBalances(address);
     
-    // Créer une transaction pour l'historique (le résultat réel sera déterminé par l'oracle)
+    // Create a transaction for history (the actual result will be determined by the oracle)
     const transaction: Transaction = {
       id: `tx_${Math.floor(Math.random() * 1000000)}`,
       betAmount,
       betToken,
       betColor,
-      result: "pending", // Le résultat est en attente
-      resultColor: "green", // Couleur temporaire avant de connaître le résultat réel (rouge, noir ou vert/zéro)
+      result: "pending", // Result is pending
+      resultColor: "green", // Temporary color before knowing the actual result (red, black, or green/zero)
       timestamp: Date.now(),
       txHash: receipt?.txHash
     };
     
-    // Retourner la réponse
+    // Return the response
     return {
-      result: "pending", // Le résultat est en attente
-      resultColor: "green", // Couleur temporaire avant de connaître le résultat réel (rouge, noir ou vert/zéro)
-      ftnDelta: 0, // Pas de delta tant que le résultat n'est pas connu
-      lbrDelta: 0, // Pas de delta tant que le résultat n'est pas connu
+      result: "pending", // Result is pending
+      resultColor: "green", // Temporary color before knowing the actual result (red, black, or green/zero)
+      ftnDelta: 0, // No delta until the result is known
+      lbrDelta: 0, // No delta until the result is known
       updatedBalances: {
         ftnBalance,
         lbrBalance
@@ -120,30 +120,29 @@ export async function getTransactionHistory(
   limit = 10
 ): Promise<Transaction[]> {
   try {
-    console.log("Récupération de l'historique des transactions pour l'adresse", address);
+    console.log("Getting transaction history for address", address);
     
-    // Obtenir le provider depuis window.ethereum
-    if (!window.ethereum) {
-      throw new Error("MetaMask n'est pas installé");
-    }
+    // Use our mock blockchain implementation
+    const mockTransactions = getMockTransactionHistory(address);
     
-    // Ne plus utiliser de simulation, toujours interagir avec la blockchain réelle
-    console.log("Récupération des transactions réelles depuis la blockchain");
+    // Convert TransactionHistory[] to Transaction[]
+    const transactions: Transaction[] = mockTransactions.map(tx => ({
+      id: tx.id,
+      betAmount: tx.amount,
+      betToken: tx.token,
+      betColor: tx.color || 'red', // Default to red if color is not available
+      result: tx.type as SpinResult, // 'win', 'loss', or 'pending'
+      resultColor: tx.resultColor as ResultColor || 'green',
+      timestamp: tx.timestamp,
+      txHash: tx.txHash
+    }));
     
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
-    
-    // Récupérer les transactions réelles depuis la blockchain
-    // Nous allons implémenter une logique pour récupérer les transactions réelles
-    // Pour l'instant, nous retournons un tableau vide
-    // TODO: Implémenter la récupération des transactions réelles
-    return [];
-    
-    // Note: Pour implémenter cette fonctionnalité complètement, il faudrait:
-    // 1. Utiliser l'API d'un explorateur de blocs comme FTNScan
-    // 2. Filtrer les transactions impliquant le contrat Roulette
-    // 3. Analyser les logs d'événements pour déterminer les résultats des paris
+    // Sort by timestamp (newest first) and limit
+    return transactions
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, limit);
   } catch (error) {
-    console.error("Erreur lors de la récupération de l'historique des transactions:", error);
+    console.error("Error fetching transaction history:", error);
     return [];
   }
 }
@@ -173,7 +172,7 @@ function generateMockTransactions(limit: number): Transaction[] {
   return mockTransactions;
 }
 
-// Interface pour les informations sur un pari résolu
+// Interface for resolved bet information
 export interface ResolvedBetInfo {
   hasResolved: boolean;
   result?: SpinResult;
@@ -184,13 +183,13 @@ export interface ResolvedBetInfo {
   lbrBalance: number;
 }
 
-// Fonction pour vérifier et récupérer les gains d'un pari résolu
+// Function to check and claim winnings from a resolved bet
 export async function checkAndClaimWinnings(): Promise<ResolvedBetInfo> {
   try {
-    // Toujours interagir directement avec la blockchain, ne plus simuler
-    // Obtenir le provider depuis window.ethereum
+    // Always interact with our mock blockchain
+    // Get provider from window.ethereum
     if (!window.ethereum) {
-      console.warn("MetaMask n'est pas installé, impossible de vérifier les gains");
+      console.warn("MetaMask is not installed, unable to check winnings");
       return {
         hasResolved: false,
         ftnDelta: 0,
@@ -204,26 +203,26 @@ export async function checkAndClaimWinnings(): Promise<ResolvedBetInfo> {
     const address = await provider.getSigner().getAddress();
     
     try {
-      // Vérifier s'il y a des gains en attente
+      // Check if there are pending withdrawals
       const withdrawalInfo = await getPendingWithdrawals(provider, address);
       
-      // Si nous avons des gains à retirer, le pari a été résolu
+      // If we have winnings to withdraw, the bet has been resolved
       if (withdrawalInfo.hasPendingWithdrawal) {
         try {
-          // Récupérer les gains
+          // Retrieve winnings
           await resolvePendingBet(provider, address);
         } catch (withdrawError) {
-          console.warn("Erreur lors du retrait des gains, mais le pari est résolu", withdrawError);
+          console.warn("Error withdrawing winnings, but the bet is resolved", withdrawError);
         }
         
-        // Obtenir les soldes mis à jour
+        // Get updated balances
         const { ftnBalance, lbrBalance } = await getBalances(address);
         
-        // Déterminer le résultat (gagné si les gains sont positifs)
+        // Determine the result (win if winnings are positive)
         const result: SpinResult = (withdrawalInfo.ftnAmount > 0 || withdrawalInfo.lbrAmount > 0) ? "win" : "loss";
         
-        // Déterminer la couleur du résultat (nous ne pouvons pas le savoir avec certitude)
-        // Générer une couleur aléatoire, avec une préférence pour la couleur qui correspond au résultat
+        // Determine the result color (we can't know for sure)
+        // Generate a random color, with a preference for the color that matches the result
         const resultColor: ResultColor = result === "win" ? (Math.random() > 0.3 ? "red" : "black") : (Math.random() > 0.7 ? "red" : "black");
         
         return {
@@ -237,11 +236,11 @@ export async function checkAndClaimWinnings(): Promise<ResolvedBetInfo> {
         };
       }
     } catch (contractError) {
-      console.error("Erreur lors de l'interaction avec les contrats:", contractError);
+      console.error("Error interacting with contracts:", contractError);
     }
     
-    // Si nous n'avons pas de pari en attente et pas de gains à retirer
-    // ou si une erreur s'est produite lors de l'interaction avec les contrats
+    // If we don't have a pending bet and no winnings to withdraw
+    // or if an error occurred while interacting with the contracts
     return {
       hasResolved: false,
       ftnDelta: 0,
