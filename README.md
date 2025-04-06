@@ -10,6 +10,8 @@
 ## Project Overview
 LooserBracket is a platform that combines gambling and liquid staking on the Bahamut blockchain. By integrating the Proof-of-Stake & Activity (POSA) algorithm and verifiable randomness via the Erinaceus oracle, it delivers an experience that generates economic returns for users while they play.
 
+![LooserBracket_FRONT](https://github.com/user-attachments/assets/c158d63a-585e-4693-94ee-ac7a9b5d4249)
+
 ## Features
 - **Verifiable Random Results**: Roulette with random results via Erinaceus VRF.
 - **Dual Token System**: Bet with FTN or LBR for different rewards.
