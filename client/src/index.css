@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Couleurs communes */
+  --primary: #8A2BE2;
+  --primary-light: #9D4EFF;
+  --primary-dark: #6A1CB0;
+  --secondary: #FF69B4;
+  --secondary-light: #FF8AC5;
+  --secondary-dark: #D84A95;
+  --accent: #FFD700;
+  --accent-light: #FFEB3B;
+  --accent-dark: #FFC107;
+  
+  /* Ombres et effets */
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --glow: 0 0 15px rgba(138, 43, 226, 0.3);
+}
+
+[data-theme='dark'] {
+  --glow: 0 0 20px rgba(138, 43, 226, 0.5);
+}
+
+.clip-triangle {
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.text-shadow {
+  text-shadow: 0 0 10px rgba(138, 43, 226, 0.5);
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    background-color: white;
+  }
+  
+  html[data-theme='dark'] {
+    background-color: #121212;
+  }
+
+  body {
+    @apply font-sans antialiased text-foreground;
+    background-color: inherit;
+    min-height: 100vh;
+  }
+  
+  html[data-theme='dark'] body {
+    color: #F8F9FA;
+  }
+}
+
+/* Classes utilitaires pour les thèmes */
+.shadow-theme {
+  box-shadow: var(--shadow);
+}
+
+.glow-theme {
+  box-shadow: var(--glow);
+}

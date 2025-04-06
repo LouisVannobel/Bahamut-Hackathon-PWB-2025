@@ -1,0 +1,25 @@
+# Fichiers d'environnement
+.env
+.env.local
+
+# Dépendances et build
+node_modules
+dist
+
+# Fichiers système
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+
+# Replit specific files
+.replit
+.replit.nix
+replit.nix
+.config
+.upm
+.breakpoints
+.cache
+.git
+.github
+.gitattributes
